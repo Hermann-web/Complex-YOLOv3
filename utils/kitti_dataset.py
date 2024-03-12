@@ -43,7 +43,7 @@ class KittiDataset(torch_data.Dataset):
 
     def get_lidar(self, idx):
         lidar_file = os.path.join(self.lidar_path, '%06d.bin' % idx)
-        assert os.path.exists(lidar_file)
+        assert os.path.exists(lidar_file), f"{lidar_file} not found"
         return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
 
     def get_calib(self, idx):

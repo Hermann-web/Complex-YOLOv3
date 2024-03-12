@@ -37,11 +37,8 @@ def predictions_to_kitti_format(img_detections, calib, img_shape_2d, img_size, R
     corners3d = []
     for index, l in enumerate(predictions):
 
-        str = "Pedestrian"
-        if l[0] == 0:str="Car"
-        elif l[0] == 1:str="Pedestrian"
-        elif l[0] == 2: str="Cyclist"
-        else:str = "DontCare"
+        dd = {0:"Car", 1:"Pedestrian", 2:"Cyclist"}
+        str = dd.get(l[0], "DontCare")
         line = '%s -1 -1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0' % str
 
         obj = kitti_utils.Object3d(line)
@@ -99,11 +96,10 @@ if __name__ == "__main__":
 
     classes = utils.load_classes(opt.class_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # Set up model
     model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
     # Load checkpoint weights
-    model.load_state_dict(torch.load(opt.weights_path))
+    model.load_state_dict(torch.load(opt.weights_path, map_location=device))
     # Eval mode
     model.eval()
     
@@ -154,7 +150,6 @@ if __name__ == "__main__":
         img2d = cv2.imread(img_paths[0])
         calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
         objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
-        
         img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
         
         cv2.imshow("bev img", RGB_Map)

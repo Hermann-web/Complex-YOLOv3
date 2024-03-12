@@ -138,6 +138,7 @@ def show_image_with_boxes(img, objects, calib, show3d=False):
         #cv2.rectangle(img2, (int(obj.xmin),int(obj.ymin)),
         #    (int(obj.xmax),int(obj.ymax)), (0,255,0), 2)
         box3d_pts_2d, box3d_pts_3d = kitti_utils.compute_box_3d(obj, calib.P)
+        print("box3d_pts_2d= ",box3d_pts_2d)
         if box3d_pts_2d is not None:
             img2 = kitti_utils.draw_projected_box3d(img2, box3d_pts_2d, cnf.colors[obj.cls_id])
     if show3d:

@@ -28,6 +28,8 @@ def makeBVFeature(PointCloud_, Discretization, bc):
     Height = cnf.BEV_HEIGHT + 1
     Width = cnf.BEV_WIDTH + 1
 
+    max_counts = cnf.MAX_COUNTS
+
     # Discretize Feature Map
     PointCloud = np.copy(PointCloud_)
     PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / Discretization))
@@ -40,20 +42,18 @@ def makeBVFeature(PointCloud_, Discretization, bc):
     # Height Map
     heightMap = np.zeros((Height, Width))
 
-    _, indices = np.unique(PointCloud[:, 0:2], axis=0, return_index=True)
-    PointCloud_frac = PointCloud[indices]
+    _, indices, counts = np.unique(PointCloud[:, 0:2], axis=0, return_index=True, return_counts=True)
+
+    PointCloud_top = PointCloud[indices]
     # some important problem is image coordinate is (y,x), not (x,y)
     max_height = float(np.abs(bc['maxZ'] - bc['minZ']))
-    heightMap[np.int_(PointCloud_frac[:, 0]), np.int_(PointCloud_frac[:, 1])] = PointCloud_frac[:, 2] / max_height
+    heightMap[np.int_(PointCloud_top[:, 0]), np.int_(PointCloud_top[:, 1])] = PointCloud_top[:, 2] / max_height
 
     # Intensity Map & DensityMap
     intensityMap = np.zeros((Height, Width))
     densityMap = np.zeros((Height, Width))
 
-    _, indices, counts = np.unique(PointCloud[:, 0:2], axis=0, return_index=True, return_counts=True)
-    PointCloud_top = PointCloud[indices]
-
-    normalizedCounts = np.minimum(1.0, np.log(counts + 1) / np.log(64))
+    normalizedCounts = np.minimum(1.0, np.log(counts + 1) / np.log(max_counts))
 
     intensityMap[np.int_(PointCloud_top[:, 0]), np.int_(PointCloud_top[:, 1])] = PointCloud_top[:, 3]
     densityMap[np.int_(PointCloud_top[:, 0]), np.int_(PointCloud_top[:, 1])] = normalizedCounts
