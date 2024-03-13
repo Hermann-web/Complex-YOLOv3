@@ -6,6 +6,7 @@ import cv2
 import time
 import torch
 
+from modules.images_to_video import images_to_video
 import utils.utils as utils
 from models import *
 import torch.utils.data as torch_data
@@ -94,6 +95,15 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
 
+    from pathlib import Path
+
+    # Create folders if they don't exist
+    OUTPUT_FOLDER_BEV = Path("docs/images/output/bev")
+    OUTPUT_FOLDER_CAM = Path("docs/images/output/cam")
+
+    OUTPUT_FOLDER_BEV.mkdir(parents=True, exist_ok=True)
+    OUTPUT_FOLDER_CAM.mkdir(parents=True, exist_ok=True)
+
     classes = utils.load_classes(opt.class_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Set up model
@@ -151,9 +161,28 @@ if __name__ == "__main__":
         calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
         objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
         img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
-        
-        cv2.imshow("bev img", RGB_Map)
-        cv2.imshow("img2d", img2d)
+
+        # cv2.imshow("bev img", RGB_Map)
+        # cv2.imshow("img2d", img2d)
+
+        index_str = str(index).zfill(3)
+
+        # Save BEV image
+        bev_image_path = OUTPUT_FOLDER_BEV / f"BEV_image_{index_str}.jpg"
+        cv2.imwrite(str(bev_image_path), RGB_Map)
+
+        # Save 2D image
+        img2d_path = OUTPUT_FOLDER_CAM / f"2D_image_{index_str}.jpg"
+        cv2.imwrite(str(img2d_path), img2d)
 
         if cv2.waitKey(0) & 0xFF == 27:
             break
+
+    images_to_video(
+        sorted(list(OUTPUT_FOLDER_BEV.iterdir())),
+        OUTPUT_FOLDER_BEV.parent / "bev-output.avi",
+    )
+    images_to_video(
+        sorted(list(OUTPUT_FOLDER_CAM.iterdir())),
+        OUTPUT_FOLDER_BEV.parent / "img2d-output.avi",
+    )

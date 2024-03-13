@@ -44,4 +44,11 @@ But it is fait, i will use his code as a part of a whole used on top of other co
 
 ## make it a video
 
-> seems like fun stuff
+i have two feeds, bev and 2dcam
+The input are the 40 first frames on a kitti sample
+
+![bev video](./images/output/bev-output.gif)
+`bev video`
+
+![cam video](./images/output/img2d-output.gif)
+`cam video`
