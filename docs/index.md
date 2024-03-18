@@ -56,3 +56,7 @@ The input are the 40 first frames on a kitti sample
 
 ![cam video](./images/output/img2d-output.gif)
 `cam video`
+
+## related links
+
+- [another repo testing yolov3](https://github.com/eriklindernoren/PyTorch-YOLOv3)
