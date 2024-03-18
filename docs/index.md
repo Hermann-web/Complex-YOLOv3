@@ -2,12 +2,16 @@
 
 The objectiv here is to test the complex yolo and of course test it on some kitti data i will chose
 
-## load data
-
+## setup env
 ```bash
-curl https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_calib.zip -o temp/data_object_calib.zip
-curl https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_label_2.zip -o temp/data_object_label2.zip
+# create a python3.8 env using any adaquate method
+# activte the env
+uv pip install -r requirements.txt
+uv pip install mayavi pyQt5 shapely
+uv pip install torch==2.2.0 torchvision torchstudio
 ```
+
+## load data
 
 ```bash
 # download calibration data and labels

@@ -16,6 +16,8 @@ KITTI_IMG_DIR="$KITTI_OBJ_AND_IMG_DIR/image_02/data"
 
 # Set directories from temp
 KITTI_OBJ_AND_IMG_DIR="/media/ubuntu/HBCD_PE_X64/data/Kitti/2011_09_26_drive_0106_sync"
+#KITTI_OBJ_AND_IMG_DIR="/mnt/c/Users/hermann.agossou/Documents/Kitti/data/2011_09_26/2011_09_26_drive_0001_sync"
+#KITTI_OBJ_AND_IMG_DIR="C:\Users\hermann.agossou\Documents\Kitti\data\2011_09_26\2011_09_26_drive_0001_sync\velodyne_points"
 KITTI_CALIB_DIR=$(realpath "./temp/data_object_calib/training/calib")
 KITTI_LABEL_DIR=$(realpath "./temp/data_object_label_2/training/label_2")
 KITTI_OBJ_DIR="$KITTI_OBJ_AND_IMG_DIR/velodyne_points/data"

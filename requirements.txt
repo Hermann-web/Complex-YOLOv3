@@ -1,5 +1,12 @@
 
-tensorflow
-terminaltables
+tensorflow==2.13.1
+terminaltables==3.1.10
 tqdm
-opencv-python
+opencv-python==4.9.0.80
+torch==2.2.0
+torchvision
+torchstudio
+mayavi
+shapely
+PYQt5
+
