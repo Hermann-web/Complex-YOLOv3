@@ -6,6 +6,7 @@ import cv2
 import time
 import torch
 
+from constants import OUTPUT_FOLDER
 from modules.images_to_video import images_to_video
 import utils.utils as utils
 from models import *
@@ -17,6 +18,12 @@ import utils.kitti_bev_utils as bev_utils
 from utils.kitti_yolo_dataset import KittiYOLODataset
 import utils.config as cnf
 import utils.mayavi_viewer as mview
+
+OUTPUT_FOLDER_COMPLEX_YOLO = OUTPUT_FOLDER / "complex-yolo-track"
+
+OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO/"dev-images"
+
+OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO/"cam-images"
 
 def predictions_to_kitti_format(img_detections, calib, img_shape_2d, img_size, RGB_Map=None):
     predictions = np.zeros([50, 7], dtype=np.float32)
@@ -95,14 +102,7 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
 
-    from pathlib import Path
 
-    # Create folders if they don't exist
-    OUTPUT_FOLDER_BEV = Path("docs/images/output/bev")
-    OUTPUT_FOLDER_CAM = Path("docs/images/output/cam")
-
-    OUTPUT_FOLDER_BEV.mkdir(parents=True, exist_ok=True)
-    OUTPUT_FOLDER_CAM.mkdir(parents=True, exist_ok=True)
 
     classes = utils.load_classes(opt.class_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -168,21 +168,21 @@ if __name__ == "__main__":
         index_str = str(index).zfill(3)
 
         # Save BEV image
-        bev_image_path = OUTPUT_FOLDER_BEV / f"BEV_image_{index_str}.jpg"
+        bev_image_path = OUTPUT_FOLDER_COMPLEX_YOLO_BEV / f"BEV_image_{index_str}.jpg"
         cv2.imwrite(str(bev_image_path), RGB_Map)
 
         # Save 2D image
-        img2d_path = OUTPUT_FOLDER_CAM / f"2D_image_{index_str}.jpg"
+        img2d_path = OUTPUT_FOLDER_COMPLEX_YOLO_CAM / f"2D_image_{index_str}.jpg"
         cv2.imwrite(str(img2d_path), img2d)
 
         if cv2.waitKey(0) & 0xFF == 27:
             break
 
     images_to_video(
-        sorted(list(OUTPUT_FOLDER_BEV.iterdir())),
-        OUTPUT_FOLDER_BEV.parent / "bev-output.avi",
+        sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_BEV.iterdir())),
+        OUTPUT_FOLDER_COMPLEX_YOLO / "bev-output.avi",
     )
     images_to_video(
-        sorted(list(OUTPUT_FOLDER_CAM.iterdir())),
-        OUTPUT_FOLDER_BEV.parent / "img2d-output.avi",
+        sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_CAM.iterdir())),
+        OUTPUT_FOLDER_COMPLEX_YOLO / "img2d-output.avi",
     )
