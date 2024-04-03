@@ -2,3 +2,4 @@
 *.pyc
 checkpoints/yolov3_ckpt_epoch-298.pth
 .venv/
+output/

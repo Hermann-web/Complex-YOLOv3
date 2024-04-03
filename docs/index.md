@@ -3,12 +3,14 @@
 The objectiv here is to test the complex yolo and of course test it on some kitti data i will chose
 
 ## setup env
+
 ```bash
 # create a python3.8 env using any adaquate method
 # activte the env
-uv pip install -r requirements.txt
-uv pip install mayavi pyQt5 shapely
-uv pip install torch==2.2.0 torchvision torchstudio
+pip install uv
+# uv pip install -r requirements.txt
+uv pip install mayavi pyQt5 shapely opencv-python tqdm
+pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ## load data
@@ -60,3 +62,153 @@ The input are the 40 first frames on a kitti sample
 ## related links
 
 - [another repo testing yolov3](https://github.com/eriklindernoren/PyTorch-YOLOv3)
+
+## new tests for trcaking
+
+```bash
+uv pip install scipy numpy
+pip install lap
+pip install cython
+pip install cython_bbox
+```
+
+### testing yolov5
+
+I wanted to use my custom yolov3 weight like this
+
+```python
+MODEL_PATH = Path("checkpoints/tiny-yolov3_ckpt_epoch-220.pth")
+use_cuda = True
+device = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"
+checkpoint = torch.load(MODEL_PATH, map_location=device)
+model.load_state_dict(checkpoint['model_state_dict'])
+model.eval()
+```
+
+But it failed
+
+So, i've loaded yolov5 from ultralytics repo directly into pytorch
+
+```python
+model = torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=False) # or yolov5m, yolov5l, yolov5x, custom
+```
+
+It download the repo, make some updated in the python modules if necessary.
+
+I've studied the prediction outputs (pytorch object) and adapted to use bytetrack class
+
+```bash
+python test_tracking_yolo.py 
+```
+
+<details>
+<summary>output</summary>
+
+Using cache found in /home/ubuntu/.cache/torch/hub/ultralytics_yolov5_master
+YOLOv5 🚀 2024-4-1 Python-3.8.18 torch-2.2.0+cpu CPU
+
+Fusing layers...
+YOLOv5s summary: 213 layers, 7225885 parameters, 0 gradients, 16.4 GFLOPs
+Adding AutoShape...
+[OT_1_(1-1), OT_2_(1-1), OT_3_(1-1), OT_4_(1-1), OT_5_(1-1), OT_6_(1-1), OT_7_(1-1), OT_8_(1-1), OT_9_(1-1)]
+[OT_1_(1-2), OT_2_(1-2), OT_3_(1-2), OT_4_(1-2), OT_5_(1-2), OT_6_(1-2), OT_7_(1-2), OT_8_(1-2)]
+...
+[OT_1_(1-36), OT_2_(1-36), OT_3_(1-36), OT_7_(1-36), OT_5_(1-36), OT_13_(3-36), OT_11_(3-36), OT_24_(26-36)]
+[OT_1_(1-37), OT_2_(1-37), OT_3_(1-37), OT_7_(1-37), OT_5_(1-37), OT_13_(3-37), OT_10_(2-37), OT_26_(33-37), OT_4_(1-37), OT_6_(1-37), OT_12_(3-37)]
+[OT_1_(1-38), OT_2_(1-38), OT_3_(1-38), OT_7_(1-38), OT_5_(1-38), OT_13_(3-38), OT_10_(2-38), OT_26_(33-38), OT_11_(3-38)]
+[OT_1_(1-39), OT_2_(1-39), OT_3_(1-39), OT_7_(1-39), OT_5_(1-39), OT_13_(3-39), OT_10_(2-39), OT_26_(33-39), OT_28_(38-39), OT_11_(3-39)]
+[OT_1_(1-40), OT_2_(1-40), OT_3_(1-40), OT_7_(1-40), OT_5_(1-40), OT_10_(2-40), OT_8_(1-40), OT_4_(1-40), OT_6_(1-40)]
+</details>
+
+The tracking is done. Now, i will process to visulaization
+
+### testing yolov5 with image output
+
+There again, i've copied the simplest experiment from bytetrack repo that did visualization and adapter the function internaly to use my prediction object
+
+```bash
+python test_tracking_yolov5_visu.py --save_result
+```
+
+<details>
+<summary>output</summary>
+Using cache found in /home/ubuntu/.cache/torch/hub/ultralytics_yolov5_master
+YOLOv5 🚀 2024-4-1 Python-3.8.18 torch-2.2.0+cpu CPU
+
+Fusing layers...
+YOLOv5s summary: 213 layers, 7225885 parameters, 0 gradients, 16.4 GFLOPs
+Adding AutoShape...
+Processing frame 20 (0.00 fps)
+Processing frame 40 (0.00 fps)
+save results to output/2024_04_03_11_45_20.txt
+saved video to docs/images/output/yolo-track/cam-output-yolov5.avi
+</details>
+
+[the output video](./images/output/yolo-track/cam-output-yolov5.avi)
+
+![output gif](./images/output/yolo-track/cam-output-yolov5.gif)
+
+I can see the tracks in the images. Maybe i can be it a video or write from webcam lol
+
+### testing yolov7
+
+I wanted to use yolov8 like this
+
+```python
+model = torch.hub.load('ultralytics/yolov8', 'yolov8n', force_reload=False)
+```
+
+But it failed
+
+In fact, ultralytics [didn't put it in support for torch.hub](https://github.com/ultralytics/ultralytics/issues/286#issuecomment-1480545123) as they prefer you use the `from ultrralitics import YOLO` method. Anyway, there was [an anwer](https://github.com/ultralytics/ultralytics/issues/286#issuecomment-1686405541) that use [a repo featuring yolov7](https://github.com/WongKinYiu/yolov7)
+
+I just needed to download the weight
+
+```bash
+wget https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7-e6.pt
+```
+
+Then, load the model with the options `force_reload=False` and `trust_repo=True`
+
+```python
+model = torch.hub.load('WongKinYiu/yolov7', 'custom', 'yolov7-e6.pt', force_reload=False, trust_repo=True)
+```
+
+I have the tracks also
+
+<details>
+<summary>output</summary>
+Using cache found in /home/ubuntu/.cache/torch/hub/WongKinYiu_yolov7_main
+
+                 from  n    params  module                                  arguments                     
+  0                -1  1         0  models.common.ReOrg                     []
+  1                -1  1      8800  models.common.Conv                      [12, 80, 3, 1]
+  2                -1  1     70880  models.common.DownC                     [80, 160, 1]
+.................................................
+.................................................
+.................................................
+.................................................
+.................................................
+134[-1, -2, -3, -4, -5, -6, -7, -8]  1         0  models.common.Concat                    [1]
+135                -1  1   1639680  models.common.Conv                      [2560, 640, 1, 1]
+136                99  1    461440  models.common.Conv                      [160, 320, 3, 1]
+137               111  1   1844480  models.common.Conv                      [320, 640, 3, 1]
+138               123  1   4149120  models.common.Conv                      [480, 960, 3, 1]
+139               135  1   7375360  models.common.Conv                      [640, 1280, 3, 1]
+140[136, 137, 138, 139]  1    817020  models.yolo.Detect                      [80, [[19, 27, 44, 40, 38, 94], [96, 68, 86, 152, 180, 137], [140, 301, 303, 264, 238, 542], [436, 615, 739, 380, 925, 792]], [320, 640, 960, 1280]]
+/home/ubuntu/Documents/GitHub/melint/lidar-object-classification-code-index/3rd-parties/Complex-YOLOv3/.venv/lib/python3.8/site-packages/torch/functional.py:507: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3549.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+Model Summary: 614 layers, 97246652 parameters, 97246652 gradients, 129.3 GFLOPS
+
+Adding autoShape...
+YOLOR 🚀 2024-4-2 torch 2.2.0+cpu CPU
+
+Processing frame 20 (0.00 fps)
+Processing frame 40 (0.00 fps)
+save results to output/2024_04_03_11_55_39.txt
+saved video to docs/images/output/yolo-track/cam-output-yolov5.avi
+</details>
+
+[the output video](./images/output/yolo-track/cam-output-yolov8.avi)
+
+![output gif](./images/output/yolo-track/cam-output-yolov8.gif)
