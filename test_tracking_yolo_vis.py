@@ -8,9 +8,9 @@ import cv2
 import os.path as osp
 import sys
 
+from bytetrack.run_tracker import run_tracker_on_frame
 from bytetrack.timer import Timer 
-from bytetrack.visualize import plot_tracking
-from constants import OUTPUT_FOLDER, OUTPUT_FOLDER_BEV
+from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER, OUTPUT_FOLDER_BEV
 from modules.images_to_video import images_to_video 
 sys.path.append("bytetrack/tracker")
 
@@ -19,10 +19,11 @@ import argparse
 from bytetrack.tracker.byte_tracker import BYTETracker
 
 
-def image_demo(files:list, tracker, predictor, vis_folder, current_time, args):
-    """
-    COPIED FROM Bytetrack_repo/tools/demo_track.py
-    """
+
+def image_demo(files:list, predictor, vis_folder, current_time, args):
+
+    tracker = BYTETracker(args)
+
     files.sort()
 
     timer = Timer()
@@ -55,31 +56,15 @@ def image_demo(files:list, tracker, predictor, vis_folder, current_time, args):
             # detections[:, :4] /= scale
             detections = outputs
 
-            # Run tracker
-            online_targets = tracker.update(detections, [img_info['height'], img_info['width']], [img_info['height'], img_info['width']])
-
-            online_tlwhs = []
-            online_ids = []
-            online_scores = []
-            for t in online_targets:
-                tlwh = t.tlwh
-                tid = t.track_id
-                vertical = tlwh[2] / tlwh[3] > args.aspect_ratio_thresh
-                if tlwh[2] * tlwh[3] > args.min_box_area and not vertical:
-                    online_tlwhs.append(tlwh)
-                    online_ids.append(tid)
-                    online_scores.append(t.score)
-                    # save results
-                    results.append(
-                        f"{frame_id},{tid},{tlwh[0]:.2f},{tlwh[1]:.2f},{tlwh[2]:.2f},{tlwh[3]:.2f},{t.score:.2f},-1,-1,-1\n"
-                    )
-            timer.toc()
-            online_im = plot_tracking(
-                img_info['raw_img'], online_tlwhs, online_ids, frame_id=frame_id, fps=1. / timer.average_time
-            )
-        else:
-            timer.toc()
-            online_im = img_info['raw_img']
+            _results, timer, online_im = run_tracker_on_frame(frame_id=frame_id, 
+                                                              tracker=tracker,
+                                                              detections=detections, 
+                                                              aspect_ratio_thresh=args.aspect_ratio_thresh,
+                                                              min_box_area=args.min_box_area,                                                              
+                                                              height=img_info['height'], width=img_info['width'], 
+                                                              raw_img=img_info['raw_img'], timer=timer
+                                                              )
+            results.extend(_results)
 
         # result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
         if args.save_result:
@@ -125,50 +110,52 @@ def make_parser():
     parser.add_argument("--mot20", dest="mot20", default=False, action="store_true", help="test mot20.")
     return parser
 
+def main():
 
-IMG_DIR = "data/KITTI/object/2011_09_26_drive_0106_sync/image_2"
-IMG_DIR = Path(IMG_DIR)
+    IMG_DIR = "data/KITTI/object/2011_09_26_drive_0106_sync/image_2"
+    IMG_DIR = Path(IMG_DIR)
 
-args = make_parser().parse_args()
-
-
-if args.model =="yolov5":
-    model = torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=False) # or yolov5m, yolov5l, yolov5x, custom
-
-elif args.model =="yolov8":
-    # model = torch.hub.load('ultralytics/yolov8', 'yolov8n', force_reload=False)
-    raise NotImplementedError("yolov8 model trough torch hub not working")
-
-elif args.model =="yolov7":
-    # wget https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7-e6.pt
-    model = torch.hub.load('WongKinYiu/yolov7', 'custom', 'yolov7-e6.pt', force_reload=False, trust_repo=True)
-
-else:
-    raise ValueError(f"unhandled model. found model = {args.model}")
-
-out_file_name = f"cam-output-{args.model}.avi"
+    args = make_parser().parse_args()
 
 
-tracker = BYTETracker(args)
+    if args.model =="yolov5":
+        model = torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=False) # or yolov5m, yolov5l, yolov5x, custom
 
-current_time = time.localtime()
+    elif args.model =="yolov8":
+        # model = torch.hub.load('ultralytics/yolov8', 'yolov8n', force_reload=False)
+        raise NotImplementedError("yolov8 model trough torch hub not working")
 
-predictor = lambda x: model(x).xyxy
+    elif args.model =="yolov7":
+        # wget https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7-e6.pt
+        model = torch.hub.load('WongKinYiu/yolov7', 'custom', 'yolov7-e6.pt', force_reload=False, trust_repo=True)
 
-vis_folder = "output"
+    else:
+        raise ValueError(f"unhandled model. found model = {args.model}")
 
-files = list(IMG_DIR.iterdir())
+    out_file_name = f"cam-output-{args.model}.avi"
 
-save_folder = image_demo(files=files, predictor=predictor, tracker=tracker, vis_folder=vis_folder, current_time=current_time, args=args)
 
-save_img_video_folder = OUTPUT_FOLDER / "yolo-track"
-save_img_video_folder.mkdir(exist_ok=True)
+    current_time = time.localtime()
 
-save_img_video_path = save_img_video_folder / out_file_name
+    predictor = lambda x: model(x).xyxy
 
-images_to_video(
-    sorted(list(Path(save_folder).iterdir())),
-    save_img_video_path,
-)
+    vis_folder = str(BYTETRACK_TRACK_IMAGES_FOLDER)
 
-print(f"saved video to {save_img_video_path} ")
+    files = list(IMG_DIR.iterdir())
+
+    save_folder = image_demo(files=files, predictor=predictor, vis_folder=vis_folder, current_time=current_time, args=args)
+
+    save_img_video_folder = OUTPUT_FOLDER / "yolo-track"
+    save_img_video_folder.mkdir(exist_ok=True)
+
+    save_img_video_path = save_img_video_folder / out_file_name
+
+    images_to_video(
+        sorted(list(Path(save_folder).iterdir())),
+        save_img_video_path,
+    )
+
+    print(f"saved video to {save_img_video_path} ")
+
+if __name__ =="__main__":
+    main()
