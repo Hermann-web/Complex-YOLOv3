@@ -8,3 +8,7 @@ OUTPUT_FOLDER_CAM = OUTPUT_FOLDER / "cam"
 
 OUTPUT_FOLDER_BEV.mkdir(parents=True, exist_ok=True)
 OUTPUT_FOLDER_CAM.mkdir(parents=True, exist_ok=True)
+
+
+BYTETRACK_TRACK_IMAGES_FOLDER = Path("bytetrack-outputs/")
+BYTETRACK_TRACK_IMAGES_FOLDER.mkdir(exist_ok=True)

@@ -127,7 +127,7 @@ The tracking is done. Now, i will process to visulaization
 There again, i've copied the simplest experiment from bytetrack repo that did visualization and adapter the function internaly to use my prediction object
 
 ```bash
-python test_tracking_yolov5_visu.py --save_result
+python test_tracking_yolo_vis.py --save_result --model yolov5
 ```
 
 <details>
@@ -174,6 +174,10 @@ Then, load the model with the options `force_reload=False` and `trust_repo=True`
 model = torch.hub.load('WongKinYiu/yolov7', 'custom', 'yolov7-e6.pt', force_reload=False, trust_repo=True)
 ```
 
+```bash
+python test_tracking_yolo_vis.py --save_result --model yolov7
+```
+
 I have the tracks also
 
 <details>
@@ -206,9 +210,9 @@ YOLOR 🚀 2024-4-2 torch 2.2.0+cpu CPU
 Processing frame 20 (0.00 fps)
 Processing frame 40 (0.00 fps)
 save results to output/2024_04_03_11_55_39.txt
-saved video to docs/images/output/yolo-track/cam-output-yolov5.avi
+saved video to docs/images/output/yolo-track/cam-output-yolov7.avi
 </details>
 
-[the output video](./images/output/yolo-track/cam-output-yolov8.avi)
+[the output video](./images/output/yolo-track/cam-output-yolov7.avi)
 
-![output gif](./images/output/yolo-track/cam-output-yolov8.gif)
+![output gif](./images/output/yolo-track/cam-output-yolov7.gif)
