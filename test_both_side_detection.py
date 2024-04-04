@@ -3,6 +3,7 @@ import math, os, argparse, time
 import cv2
 import torch
 
+from utils.pred_to_kitti import predictions_to_kitti_format
 import utils.utils as utils
 from models import *
 
@@ -12,7 +13,6 @@ import utils.kitti_bev_utils as bev_utils
 import utils.kitti_utils as kitti_utils
 import utils.mayavi_viewer as mview
 import utils.config as cnf
-from test_detection import predictions_to_kitti_format
 
 def detect_and_draw(model, bev_maps, Tensor, is_front=True):
 
