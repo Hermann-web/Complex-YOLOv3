@@ -216,3 +216,39 @@ saved video to docs/images/output/yolo-track/cam-output-yolov7.avi
 [the output video](./images/output/yolo-track/cam-output-yolov7.avi)
 
 ![output gif](./images/output/yolo-track/cam-output-yolov7.gif)
+
+## testing the tracker on pred on bev images
+
+```bash
+python test_tracking_complex_yolo.py --split=sample2 --folder=2011_09_26_drive_0106_sync --save_result --aspect_ratio_thresh=10
+```
+
+I've refactored the tracking process into a function that take as arg
+
+```python
+run_tracker_on_frame(
+  frame_id:int, # id of the frame
+  tracker:BYTETracker, # the bytrack instance
+  detections, # array.shape=(nb_objects_detected, 5 or 6) = for each obj, x1,y1,x2,y2,score
+  height:int, width:int, #dims of the bev image
+  raw_img:np.ndarray, #the bev image (loaded from cv2 to array)
+  aspect_ratio_thresh:float=1.6, #the greater, the more tracks 
+  min_box_area:float=10, #the less, the more tracks
+  timer:Timer=None #to take track
+  )
+```
+
+[the output video](./images/output/complex-yolo-track/cam-output-complex-yolo.avi)
+
+![](./images/output/complex-yolo-track/cam-output-complex-yolo.gif)
+
+Track are found when augmenting aspect_ratio_thresh and reducing
+
+I have some results but still far from industry acceptable, as i have only two tracks out of 17.
+
+Ameliorations include :
+
+- working on the tresholds `aspect_ratio_thresh`, `min_box_area`
+- read on these treshholds, but essentily the bytetrack method
+- try to level up using bot sort ?
+- track on images instead of bev ?, track 3D bbox instead of just a rectangle ?

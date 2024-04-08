@@ -8,12 +8,12 @@ import cv2
 import os.path as osp
 import sys
 
-from bytetrack.run_tracker import run_tracker_on_frame
 from bytetrack.timer import Timer 
 from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER, OUTPUT_FOLDER_BEV
 from modules.images_to_video import images_to_video 
 sys.path.append("bytetrack/tracker")
 
+from bytetrack.run_tracker import run_tracker_on_frame
 import argparse
 
 from bytetrack.tracker.byte_tracker import BYTETracker

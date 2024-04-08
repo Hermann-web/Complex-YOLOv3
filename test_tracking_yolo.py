@@ -45,6 +45,8 @@ for img_path in IMG_DIR.iterdir():
     detections = results.xyxy
     assert len(detections)==1
     detections = detections[0]
+    print(f"detections = {detections}")
+    # print(f"detections: {detections.shape}")
     img_info = {"id": 0}
     height, width = image.shape[:2]
     img_info["height"] = height
@@ -52,4 +54,6 @@ for img_path in IMG_DIR.iterdir():
     img_info["raw_img"] = image
     online_targets = tracker.update(detections, [img_info['height'], img_info['width']], [img_info['height'], img_info['width']])
 
-    print(online_targets)
+    # print(f"online_targets = {online_targets}")
+
+    break

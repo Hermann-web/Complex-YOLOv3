@@ -1,8 +1,13 @@
 
+import numpy as np
+import torch
 from bytetrack.timer import Timer 
 from bytetrack.visualize import plot_tracking
+from .tracker.byte_tracker import BYTETracker
 
-def run_tracker_on_frame(frame_id, tracker, detections, height:int, width:int, raw_img:str, aspect_ratio_thresh:float=1.6, min_box_area:float=10, timer:Timer=None):
+TWEAK_A_BIT = True
+
+def run_tracker_on_frame(frame_id:int, tracker:BYTETracker, detections:torch.Tensor, height:int, width:int, raw_img:np.ndarray, aspect_ratio_thresh:float=1.6, min_box_area:float=10, timer:Timer=None):
     """
     COPIED FROM Bytetrack_repo/tools/demo_track.py
     """
@@ -14,11 +19,17 @@ def run_tracker_on_frame(frame_id, tracker, detections, height:int, width:int, r
     online_tlwhs = []
     online_ids = []
     online_scores = []
+    if not len(online_targets):
+        print("no online targets !!")
+        return results, timer, None
+    
     for t in online_targets:
         tlwh = t.tlwh
         tid = t.track_id
         vertical = tlwh[2] / tlwh[3] > aspect_ratio_thresh
-        if tlwh[2] * tlwh[3] > min_box_area and not vertical:
+        print(min_box_area, "<?", tlwh[2] * tlwh[3], "and", tlwh[2] / tlwh[3], "<?", aspect_ratio_thresh)
+        if TWEAK_A_BIT or (tlwh[2] * tlwh[3] > min_box_area and not vertical):
+            print("in there ----------------")
             online_tlwhs.append(tlwh)
             online_ids.append(tid)
             online_scores.append(t.score)
@@ -31,6 +42,7 @@ def run_tracker_on_frame(frame_id, tracker, detections, height:int, width:int, r
                 raw_img, online_tlwhs, online_ids, frame_id=frame_id, fps=1. / timer.average_time
             )
         else:
+            print("not in there -----------------")
             if timer is not None: timer.toc()
             online_im = raw_img
 

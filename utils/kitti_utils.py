@@ -345,8 +345,8 @@ def compute_box_3d(obj, P):
     y_corners = [0,0,0,0,-h,-h,-h,-h]
     z_corners = [w/2,-w/2,-w/2,w/2,w/2,-w/2,-w/2,w/2]
 
-    print(f"box dimensions = l={l} w={w} h={h}")
-    print("3D corners = ", np.vstack([x_corners,y_corners,z_corners]).T)
+    # print(f"box dimensions = l={l} w={w} h={h}")
+    # print("3D corners = ", np.vstack([x_corners,y_corners,z_corners]).T)
         
     # rotate and translate 3d bounding box
     corners_3d = np.dot(R, np.vstack([x_corners,y_corners,z_corners]))
@@ -418,3 +418,4 @@ def draw_projected_box3d(image, qs, color=(255,0,255), thickness=2):
        i,j=k,k+4
        cv2.line(image, (qs[i,0],qs[i,1]), (qs[j,0],qs[j,1]), color, thickness)
     return image
+
