@@ -12,7 +12,7 @@ from bytetrack.timer import Timer
 
 from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER
 from modules.images_to_video import images_to_video
-from utils.pred_to_kitti import predictions_to_kitti_format
+from utils.pred_to_kitti import predictions_to_kitti_format, predictions_to_kitti_format_v2
 import utils.utils as utils
 from models import *
 import torch.utils.data as torch_data
@@ -44,13 +44,14 @@ def objects_pred_parsing_for_bytetrack(objects_pred, calib):
         x1, y1 = box3d_pts_2d[2]
         x2, y2 = box3d_pts_2d[7]
         preds_parsed[i,:4] = (x1, y1, x2, y2)
+        preds_parsed[i, 4] = float(obj.conf)
     return torch.Tensor(preds_parsed)
 
 
 
 TEST_TRACKING = False
 TEST_DETECTION = False
-TEST_TRACKING_FROM_IMG = True
+TEST_TRACKING_FROM_IMG = not TEST_TRACKING
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -95,6 +96,18 @@ if __name__ == "__main__":
         save_folder = vis_folder / timestamp
         save_folder.mkdir(exist_ok=True)
         res_file = str(vis_folder/f"{timestamp}.txt")
+
+    if TEST_TRACKING_FROM_IMG:
+        # some initialisation for tracking
+        tracker_img = BYTETracker(opt)
+        cam_results = []
+        start_time2 = time.time()
+        timer2 = Timer()
+        vis_folder = BYTETRACK_TRACK_IMAGES_FOLDER
+        timestamp = time.strftime("%Y_%m_%d_%H_%M_%S-img", time.localtime())
+        save_folder2 = vis_folder / timestamp
+        save_folder2.mkdir(exist_ok=True)
+        res_file2 = str(vis_folder/f"{timestamp}.txt")
         
 
     # some initialisation for model
@@ -123,10 +136,10 @@ if __name__ == "__main__":
 
         # Get detections 
         with torch.no_grad():
-            detections = model(input_imgs)
-            detections: List[torch.Tensor] = utils.non_max_suppression_rotated_bbox(detections, opt.conf_thres, opt.nms_thres) 
+            detections_base = model(input_imgs)
+            detections_base: List[torch.Tensor] = utils.non_max_suppression_rotated_bbox(detections_base, opt.conf_thres, opt.nms_thres) 
         img_detections = []  # Stores detections for each image index
-        img_detections.extend(detections)
+        img_detections.extend(detections_base)
 
 
         # get BEV_map from bev img data
@@ -161,14 +174,6 @@ if __name__ == "__main__":
             if cv2.waitKey(0) & 0xFF == 27:
                 break
 
-        if TEST_TRACKING_FROM_IMG:
-            mg2d = cv2.imread(img_paths[0])
-            calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-            objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
-            objects_pred_parsed = objects_pred_parsing_for_bytetrack(objects_pred, calib)
-            # fuck the v does not contain the conf (score); the info is lost in the img_detections -> predictions_to_kitti_format -> objects_pred
-            # and there's no sense or proper indexing. I may need to update the object 
-
         if TEST_TRACKING:
             # some data for tracking
             height, width, _ = bev_maps.shape
@@ -182,7 +187,31 @@ if __name__ == "__main__":
             print(f"FPS: {(1.0/(end_time-start_time)):0.2f}")
             start_time = end_time
             print(f"img_info: width={width} heigth={height}")
-            print(f"detections: type={type(detections)} len={len(detections)} elt0:type={type(detections[0])} shape={detections[0].shape}")
+            print(f"img_detections: type={type(img_detections)} len={len(img_detections)} elt0:type={type(img_detections[0])} shape={img_detections[0].shape}")
+
+        if TEST_TRACKING_FROM_IMG:
+            img2d = cv2.imread(img_paths[0])
+            calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
+            objects_pred = predictions_to_kitti_format_v2(img_detections, calib, img2d.shape, opt.img_size)  
+            objects_pred_parsed = objects_pred_parsing_for_bytetrack(objects_pred, calib)
+            print("objects_pred_parsed.shape = ",objects_pred_parsed.shape)
+            # fuck the v does not contain the conf (score); the info is lost in the img_detections -> predictions_to_kitti_format -> objects_pred
+            # and there's no sense or proper indexing. I may need to update the object 
+            
+            # some data for tracking
+            height, width = img2d.shape[:2]
+            cam_img_info = {
+                "height": height,
+                "width": width,
+                "raw_img": img2d
+            }
+            
+            frame_id = index
+            end_time2 = time.time()
+            print(f"FPS: {(1.0/(end_time2-start_time2)):0.2f}")
+            start_time2 = end_time2
+            print(f"cam_img_info: width={width} heigth={height}")
+            print(f"cam_img_detections: elt0:type={type(objects_pred_parsed)} shape={objects_pred_parsed.shape}")
 
 
         
@@ -245,6 +274,39 @@ if __name__ == "__main__":
                 if ch == 27 or ch == ord("q") or ch == ord("Q"):
                     break
 
+        if TEST_TRACKING_FROM_IMG:
+            detections_parsed = objects_pred_parsed
+            assert detections_parsed.shape[0] > 0
+            assert detections_parsed.shape[1] == 5
+
+            # the actual tracking
+            print("running tracker ...")
+            tracklets, timer, online_im = run_tracker_on_frame(frame_id=frame_id, 
+                                                            tracker=tracker_img,
+                                                            detections=detections_parsed, 
+                                                            aspect_ratio_thresh=opt.aspect_ratio_thresh,
+                                                            min_box_area=opt.min_box_area,                                                              
+                                                            height=cam_img_info['height'], width=cam_img_info['width'], 
+                                                            raw_img=cam_img_info['raw_img'], timer=timer2
+                                                            )
+            print("done running tracker")
+            cam_results.extend(tracklets)
+            print(f"nb_detection = {detections_parsed.shape[0]}")
+            print(f"nb_tracklets = {len(tracklets)}")
+
+            # result_image = predictor.visual(outputs[0], img_info, predictor.confthre)
+            if opt.save_result and online_im is not None:
+                print(f"detections: {type(detections_parsed)}: {detections_parsed.shape}") #<class 'torch.Tensor'>: torch.Size([11, 9])
+                print(f"online_im: type={type(online_im)} shape={online_im.shape if online_im is not None else ''}")
+                cv2.imwrite(str(save_folder2 / Path(img_paths[0]).name), online_im)
+
+            if frame_id % 20 == 0:
+                print('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer2.average_time)))
+
+            ch = cv2.waitKey(0)
+            if ch == 27 or ch == ord("q") or ch == ord("Q"):
+                break
+
     if TEST_DETECTION:
         images_to_video(
             sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_BEV.iterdir())),
@@ -273,3 +335,23 @@ if __name__ == "__main__":
         )
 
         print(f"saved video to {save_img_video_path} ")
+    
+    if TEST_TRACKING_FROM_IMG:
+        if opt.save_result:
+            with open(res_file2, 'w') as f:
+                f.writelines(cam_results)
+            print(f"save cam_results to {res_file2}")
+        
+        save_img_video_folder = OUTPUT_FOLDER / "complex-yolo-track-img"
+        save_img_video_folder.mkdir(exist_ok=True)
+
+        out_file_name = f"cam-output-complex-yolo.avi"
+        save_img_video_path = save_img_video_folder / out_file_name
+
+        images_to_video(
+            sorted(list(Path(save_folder2).iterdir())),
+            save_img_video_path,
+        )
+
+        print(f"saved video to {save_img_video_path} ")
+
