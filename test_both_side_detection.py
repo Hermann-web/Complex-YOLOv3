@@ -3,7 +3,6 @@ import math, os, argparse, time
 import cv2
 import torch
 
-from utils.pred_to_kitti import predictions_to_kitti_format
 import utils.utils as utils
 from models import *
 
@@ -11,6 +10,7 @@ import torch.utils.data as torch_data
 from utils.kitti_yolo_dataset import KittiYOLO2WayDataset
 import utils.kitti_bev_utils as bev_utils
 import utils.kitti_utils as kitti_utils
+import utils.kitti_prediction_utils as pred_utils
 import utils.mayavi_viewer as mview
 import utils.config as cnf
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         img2d = cv2.imread(img_paths[0])
         calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-        objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
+        objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
         img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
 
         img2d = cv2.resize(img2d, (opt.img_size*2, 375))

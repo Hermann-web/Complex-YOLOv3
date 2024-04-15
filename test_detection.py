@@ -6,13 +6,13 @@ import torch
 
 from constants import OUTPUT_FOLDER
 from modules.images_to_video import images_to_video
-from utils.pred_to_kitti import predictions_to_kitti_format
 import utils.utils as utils
 from models import *
 import torch.utils.data as torch_data
 
 import utils.kitti_utils as kitti_utils
 import utils.kitti_bev_utils as bev_utils
+import utils.kitti_prediction_utils as pred_utils
 from utils.kitti_yolo_dataset import KittiYOLODataset
 import utils.config as cnf
 import utils.mayavi_viewer as mview
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
         img2d = cv2.imread(img_paths[0])
         calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-        objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
+        objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
         img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
 
         cv2.imshow("bev img", RGB_Map)

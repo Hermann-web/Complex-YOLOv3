@@ -12,7 +12,6 @@ from bytetrack.timer import Timer
 
 from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER
 from modules.images_to_video import images_to_video
-from utils.pred_to_kitti import predictions_to_kitti_format, predictions_to_kitti_format_v2
 import utils.utils as utils
 from models import *
 import torch.utils.data as torch_data
@@ -20,6 +19,8 @@ import torch.utils.data as torch_data
 import utils.kitti_utils as kitti_utils
 import utils.kitti_aug_utils as aug_utils
 import utils.kitti_bev_utils as bev_utils
+import utils.kitti_prediction_utils as pred_utils
+import utils.kitty_tracking_utils as tracking_utils
 from utils.kitti_yolo_dataset import KittiYOLODataset
 import utils.config as cnf
 import utils.mayavi_viewer as mview
@@ -36,20 +37,10 @@ OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO/"dev-images"
 OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO/"cam-images"
 
 
-def objects_pred_parsing_for_bytetrack(objects_pred, calib):
-    preds_parsed = np.zeros((len(objects_pred),5))
-    for i,obj in enumerate(objects_pred):
-        box3d_pts_2d, box3d_pts_3d = kitti_utils.compute_box_3d(obj, calib.P)
-        print("box3d_pts_2d= ",box3d_pts_2d)
-        x1, y1 = box3d_pts_2d[2]
-        x2, y2 = box3d_pts_2d[7]
-        preds_parsed[i,:4] = (x1, y1, x2, y2)
-        preds_parsed[i, 4] = float(obj.conf)
-    return torch.Tensor(preds_parsed)
 
 
 
-TEST_TRACKING = False
+TEST_TRACKING = True
 TEST_DETECTION = False
 TEST_TRACKING_FROM_IMG = not TEST_TRACKING
 
@@ -155,7 +146,7 @@ if __name__ == "__main__":
 
             img2d = cv2.imread(img_paths[0])
             calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-            objects_pred = predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size)  
+            objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
             img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
 
             cv2.imshow("bev img", RGB_Map)
@@ -192,11 +183,15 @@ if __name__ == "__main__":
         if TEST_TRACKING_FROM_IMG:
             img2d = cv2.imread(img_paths[0])
             calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-            objects_pred = predictions_to_kitti_format_v2(img_detections, calib, img2d.shape, opt.img_size)  
-            objects_pred_parsed = objects_pred_parsing_for_bytetrack(objects_pred, calib)
+            objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=True)  
+            objects_pred_parsed = tracking_utils.objects_pred_parsing_for_bytetrack(objects_pred, calib, img2d)
+            objects_pred_parsed = torch.Tensor(objects_pred_parsed)
             print("objects_pred_parsed.shape = ",objects_pred_parsed.shape)
             # fuck the v does not contain the conf (score); the info is lost in the img_detections -> predictions_to_kitti_format -> objects_pred
             # and there's no sense or proper indexing. I may need to update the object 
+
+            img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
+            cv2.imshow("img2d", img2d)
             
             # some data for tracking
             height, width = img2d.shape[:2]
@@ -213,14 +208,13 @@ if __name__ == "__main__":
             print(f"cam_img_info: width={width} heigth={height}")
             print(f"cam_img_detections: elt0:type={type(objects_pred_parsed)} shape={objects_pred_parsed.shape}")
 
+        # get detections
+        detections = img_detections[0]
 
-        
-        for detections in img_detections:
-            if detections is None:
-                continue
+        # Rescale boxes to original image
+        detections = utils.rescale_boxes(detections, opt.img_size, RGB_Map.shape[:2])
 
-            # Rescale boxes to original image
-            detections = utils.rescale_boxes(detections, opt.img_size, RGB_Map.shape[:2])
+        if 1:
 
             if TEST_DETECTION:
                 for x, y, w, l, im, re, conf, cls_conf, cls_pred in detections:
@@ -229,22 +223,9 @@ if __name__ == "__main__":
                     bev_utils.drawRotatedBox(RGB_Map, x, y, w, l, yaw, cnf.colors[int(cls_pred)])
 
             if TEST_TRACKING:
-                detections_parsed = np.zeros((len(detections), 5)) #x1,y1,x2,y2,score
-
-                ix=-1
-                for x, y, w, l, im, re, conf, cls_conf, cls_pred in detections:
-                    ix +=1
-                    yaw = np.arctan2(im, re)
-                    
-                    bev_corners = bev_utils.get_corners(x, y, w, l, yaw) # = (4,2) = 4 points(x,y)
-                    x1, y1 = bev_corners[0] #front left
-                    x2, y2 = bev_corners[2] #rear right
-                    print(f"bbox: x1y1x2y2={x1, y1, x2, y2} score={cls_conf}")
-                    detections_parsed[ix, [0,1,2,3]] = (x1, y1, x2, y2)
-                    detections_parsed[ix, [4]] = float(conf) #int(confidence))
-
+                detections_parsed = tracking_utils.parse_detections_for_bev(detections)
                 # convert numpy object to tensor
-                detections_parsed = torch.tensor(detections_parsed)
+                detections_parsed = torch.Tensor(detections_parsed)
 
                 # the actual tracking
                 print("running tracker ...")

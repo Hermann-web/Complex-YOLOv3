@@ -252,3 +252,109 @@ Ameliorations include :
 - read on these treshholds, but essentily the bytetrack method
 - try to level up using bot sort ?
 - track on images instead of bev ?, track 3D bbox instead of just a rectangle ?
+
+## tryout
+
+```bash
+python test_tracking_complex_yolo.py --split=sample2 --folder=2011_09_26_drive_0106_sync --save_result --aspect_ratio_thresh=10
+```
+
+Well, the problem was in the geometry
+Draw 3d bounding box in image
+
+```markdown
+    qs: (8,3) array of vertices for the 3d box in following order:
+        1 -------- 0
+        /|         /|
+      2 -------- 3 .
+      | |        | |
+      . 5 -------- 4
+      |/         |/
+      6 -------- 7
+```
+
+Here is the bounding box.
+I did different mistakes
+
+**coordinates integration:**
+
+When sending x1y1x2y2 do the tracker, i consider the front plane so i send `x1,y1=front_left=P[2]` and `x2,y2=rear_right=P[7]`. Well, after the visu, i saw the plane i though was front, was actually behind
+
+  ```python
+  L = [2,6,7,3]
+  print("box3d_pts_2d= ",box3d_pts_2d)
+  x1, y1 = box3d_pts_2d[L[0]]
+  x2, y2 = box3d_pts_2d[L[2]]
+  ```
+
+![2D bbox from 3Dbbox point selection](./images/box-exxp/part-boxes-example1.png)
+
+It is easy to see when we compare to the 3D bbox
+
+![origin 3D box](./images/box-exxp/full-boxes-example.png)
+
+I tried to change the 2Dbbox to cover the objects
+
+  ```python
+  L = [2,5,4,3]
+  print("box3d_pts_2d= ",box3d_pts_2d)
+  x1, y1 = box3d_pts_2d[L[0]]
+  x2, y2 = box3d_pts_2d[L[2]]
+  ```
+
+I've tried it on the img coordinate tracking and didnt get any result, like always.
+
+![variation of the 2D bbox for more cover](./images/box-exxp/part-boxes-example2.png)
+
+Judging by the result above, i didn't cover and and it makes sense
+
+Further considerations, are consistant with a real visu that seammed like this instead
+
+```markdown
+    qs: (8,3) array of vertices for the 3d box in following order:
+        6 -------- 7
+        /|         /|
+      5 -------- 4 .
+      | |        | |
+      . 2 -------- 3
+      |/         |/
+      1 -------- 0
+```
+
+I had some idea and did try swaping x1 and x2 on the fly. And i detected all object except for the two cars i only detected till now.
+
+Now, i though i could choose wisely a plane, it should contains the corners: for examples, i can reserve as bottom left, `P1` is at t top right, `P7`.
+
+And i can't choose a top left or a bottom right, so i thougn i will just use `x1,y1 = top_left= max(x),max(y)` and `x2,y2 = bottom_right=min(x),min(y)`
+
+Well, that is dumb because the camera plane is like this: x, left to right and y, top to bottom
+
+In fact, the camera plane look like below
+
+```markdown
+      0 ----x---->
+      |
+      y
+      |
+      |
+```
+
+so `x1,y1 = top_left = min(x), min(y)`, `x1,y1 = bottom_right = max(x), max(y)`
+
+And i have the tracks, both on bev coordinate trackings and img coordinate trackings, using the same technique.
+
+**rerun the script:**
+
+```bash
+python test_tracking_complex_yolo.py --split=sample2 --folder=2011_09_26_drive_0106_sync --save_result --aspect_ratio_thresh=10
+```
+
+results
+
+- with `TEST_TRACKING = True`, `TEST_DETECTION = False`: [video output](./images/output/complex-yolo-track/cam-output-complex-yolo.avi)
+
+  ![result of tracking on bev space](./images/output/complex-yolo-track/cam-output-complex-yolo.gif)
+
+- with `TEST_TRACKING = False`, `TEST_DETECTION = False`: ![video output](./images/output/complex-yolo-track-img/cam-output-complex-yolo.avi)
+
+  ![result of tracking on img space](./images/output/complex-yolo-track-img/cam-output-complex-yolo.gif)

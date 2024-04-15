@@ -1,3 +1,4 @@
+from typing import Dict
 import numpy as np
 import math
 import torch
@@ -133,43 +134,18 @@ def build_yolo_target(labels):
 
     return target
 
-def inverse_yolo_target(targets, bc):
+def inverse_yolo_target(targets:np.ndarray, bc:Dict[str, float], add_conf:bool=False):
     ntargets = 0
     for i, t in enumerate(targets):
         if t.sum(0):ntargets += 1
     
-    labels = np.zeros([ntargets, 8], dtype=np.float32)
+    if not add_conf:
+        assert targets.shape[1] == 7
+        # add a col filled with 0
+        targets = np.column_stack((targets, np.zeros(targets.shape[0])))
 
-    n = 0
-    for t in targets:
-        if t.sum(0) == 0:
-            continue
+    assert targets.shape[1] == 8
 
-        c, y, x, w, l, im, re = t        
-        z, h = -1.55, 1.5
-        if c == 1: 
-            h = 1.8
-        elif c == 2:
-            h = 1.4
-
-        y = y * (bc["maxY"] - bc["minY"]) + bc["minY"]
-        x = x * (bc["maxX"] - bc["minX"]) + bc["minX"]
-        w = w * (bc["maxY"] - bc["minY"])
-        l = l * (bc["maxX"] - bc["minX"])
-
-        w -= 0.3
-        l -= 0.3
-
-        labels[n, :] = c, x, y, z, h, w, l, - np.arctan2(im, re) - 2*np.pi
-        n += 1
-
-    return labels
-
-def inverse_yolo_target_v2(targets, bc):
-    ntargets = 0
-    for i, t in enumerate(targets):
-        if t.sum(0):ntargets += 1
-    
     labels = np.zeros([ntargets, 9], dtype=np.float32)
 
     n = 0
@@ -177,7 +153,7 @@ def inverse_yolo_target_v2(targets, bc):
         if t.sum(0) == 0:
             continue
 
-        c, y, x, w, l, im, re, conf = t        
+        c, y, x, w, l, im, re, conf = t       
         z, h = -1.55, 1.5
         if c == 1: 
             h = 1.8

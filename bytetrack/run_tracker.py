@@ -5,8 +5,6 @@ from bytetrack.timer import Timer
 from bytetrack.visualize import plot_tracking
 from .tracker.byte_tracker import BYTETracker
 
-TWEAK_A_BIT = True
-
 def run_tracker_on_frame(frame_id:int, tracker:BYTETracker, detections:torch.Tensor, height:int, width:int, raw_img:np.ndarray, aspect_ratio_thresh:float=1.6, min_box_area:float=10, timer:Timer=None):
     """
     COPIED FROM Bytetrack_repo/tools/demo_track.py
@@ -28,7 +26,7 @@ def run_tracker_on_frame(frame_id:int, tracker:BYTETracker, detections:torch.Ten
         tid = t.track_id
         vertical = tlwh[2] / tlwh[3] > aspect_ratio_thresh
         print(min_box_area, "<?", tlwh[2] * tlwh[3], "and", tlwh[2] / tlwh[3], "<?", aspect_ratio_thresh)
-        if TWEAK_A_BIT or (tlwh[2] * tlwh[3] > min_box_area and not vertical):
+        if tlwh[2] * tlwh[3] > min_box_area and not vertical:
             print("in there ----------------")
             online_tlwhs.append(tlwh)
             online_ids.append(tid)
