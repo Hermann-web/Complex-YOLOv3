@@ -9,7 +9,7 @@ import os.path as osp
 import sys
 
 from bytetrack.timer import Timer 
-from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER, OUTPUT_FOLDER_BEV
+from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER
 from modules.images_to_video import images_to_video 
 sys.path.append("bytetrack/tracker")
 

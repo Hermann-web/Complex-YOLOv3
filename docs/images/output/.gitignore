@@ -1,3 +1,6 @@
-bev/
-cam/
+*.png
+*.jpg
+*.gif
+*-img.txt
+*-bev.txt
 

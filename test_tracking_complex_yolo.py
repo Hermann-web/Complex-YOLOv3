@@ -10,7 +10,7 @@ import torch
 
 from bytetrack.timer import Timer
 
-from constants import BYTETRACK_TRACK_IMAGES_FOLDER, OUTPUT_FOLDER
+from constants import OUTPUT_FOLDER
 from modules.images_to_video import images_to_video
 import utils.utils as utils
 from models import *
@@ -30,19 +30,21 @@ sys.path.append("bytetrack/tracker")
 from bytetrack.tracker.byte_tracker import BYTETracker
 from bytetrack.run_tracker import run_tracker_on_frame
 
-OUTPUT_FOLDER_COMPLEX_YOLO = OUTPUT_FOLDER / "complex-yolo-track"
+OUTPUT_FOLDER_COMPLEX_YOLO_TRACK = OUTPUT_FOLDER / "complex-yolo-track"
+OUTPUT_FOLDER_COMPLEX_YOLO_TRACK.mkdir(exist_ok=True)
 
-OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO/"dev-images"
-
-OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO/"cam-images"
-
+# where to save images post detection
+OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK/"bev-images"
+OUTPUT_FOLDER_COMPLEX_YOLO_BEV.mkdir(exist_ok=True)
+OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK/"cam-images"
+OUTPUT_FOLDER_COMPLEX_YOLO_CAM.mkdir(exist_ok=True)
 
 
 
 
 TEST_TRACKING = True
-TEST_DETECTION = False
-TEST_TRACKING_FROM_IMG = not TEST_TRACKING
+TEST_DETECTION = True
+TEST_TRACKING_FROM_IMG = True
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -82,8 +84,8 @@ if __name__ == "__main__":
         results = []
         start_time = time.time()
         timer = Timer()
-        vis_folder = BYTETRACK_TRACK_IMAGES_FOLDER
-        timestamp = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())
+        vis_folder = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK
+        timestamp = time.strftime("%Y_%m_%d_%H_%M_%S-bev", time.localtime())
         save_folder = vis_folder / timestamp
         save_folder.mkdir(exist_ok=True)
         res_file = str(vis_folder/f"{timestamp}.txt")
@@ -94,7 +96,7 @@ if __name__ == "__main__":
         cam_results = []
         start_time2 = time.time()
         timer2 = Timer()
-        vis_folder = BYTETRACK_TRACK_IMAGES_FOLDER
+        vis_folder = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK
         timestamp = time.strftime("%Y_%m_%d_%H_%M_%S-img", time.localtime())
         save_folder2 = vis_folder / timestamp
         save_folder2.mkdir(exist_ok=True)
@@ -142,28 +144,6 @@ if __name__ == "__main__":
         RGB_Map *= 255
         RGB_Map = RGB_Map.astype(np.uint8)
 
-        if TEST_DETECTION:
-
-            img2d = cv2.imread(img_paths[0])
-            calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
-            objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
-            img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
-
-            cv2.imshow("bev img", RGB_Map)
-            cv2.imshow("img2d", img2d)
-
-            index_str = str(index).zfill(3)
-
-            # Save BEV image
-            bev_image_path = OUTPUT_FOLDER_COMPLEX_YOLO_BEV / f"BEV_image_{index_str}.jpg"
-            cv2.imwrite(str(bev_image_path), RGB_Map)
-
-            # Save 2D image
-            img2d_path = OUTPUT_FOLDER_COMPLEX_YOLO_CAM / f"2D_image_{index_str}.jpg"
-            cv2.imwrite(str(img2d_path), img2d)
-
-            if cv2.waitKey(0) & 0xFF == 27:
-                break
 
         if TEST_TRACKING:
             # some data for tracking
@@ -221,6 +201,27 @@ if __name__ == "__main__":
                     yaw = np.arctan2(im, re)
                     # Draw rotated box
                     bev_utils.drawRotatedBox(RGB_Map, x, y, w, l, yaw, cnf.colors[int(cls_pred)])
+
+                img2d = cv2.imread(img_paths[0])
+                calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
+                objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
+                img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
+
+                cv2.imshow("bev img", RGB_Map)
+                cv2.imshow("img2d", img2d)
+
+                index_str = str(index).zfill(3)
+
+                # Save BEV image
+                bev_image_path = OUTPUT_FOLDER_COMPLEX_YOLO_BEV / f"BEV_image_{index_str}.jpg"
+                cv2.imwrite(str(bev_image_path), RGB_Map)
+
+                # Save 2D image
+                img2d_path = OUTPUT_FOLDER_COMPLEX_YOLO_CAM / f"2D_image_{index_str}.jpg"
+                cv2.imwrite(str(img2d_path), img2d)
+
+                if cv2.waitKey(0) & 0xFF == 27:
+                    break
 
             if TEST_TRACKING:
                 detections_parsed = tracking_utils.parse_detections_for_bev(detections)
@@ -289,14 +290,20 @@ if __name__ == "__main__":
                 break
 
     if TEST_DETECTION:
+
+        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "bev-output-complex-yolo-detect.avi"
         images_to_video(
             sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_BEV.iterdir())),
-            OUTPUT_FOLDER_COMPLEX_YOLO / "bev-output.avi",
+            save_img_video_path,
         )
+        print(f"saved video to {save_img_video_path} ")
+
+        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "cam-output-complex-yolo-detect.avi"
         images_to_video(
             sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_CAM.iterdir())),
-            OUTPUT_FOLDER_COMPLEX_YOLO / "img2d-output.avi",
+            save_img_video_path,
         )
+        print(f"saved video to {save_img_video_path} ")
     
     if TEST_TRACKING:
         if opt.save_result:
@@ -304,11 +311,7 @@ if __name__ == "__main__":
                 f.writelines(results)
             print(f"save results to {res_file}")
         
-        save_img_video_folder = OUTPUT_FOLDER / "complex-yolo-track"
-        save_img_video_folder.mkdir(exist_ok=True)
-
-        out_file_name = f"cam-output-complex-yolo.avi"
-        save_img_video_path = save_img_video_folder / out_file_name
+        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "bev-output-complex-yolo-track.avi"
 
         images_to_video(
             sorted(list(Path(save_folder).iterdir())),
@@ -323,11 +326,7 @@ if __name__ == "__main__":
                 f.writelines(cam_results)
             print(f"save cam_results to {res_file2}")
         
-        save_img_video_folder = OUTPUT_FOLDER / "complex-yolo-track-img"
-        save_img_video_folder.mkdir(exist_ok=True)
-
-        out_file_name = f"cam-output-complex-yolo.avi"
-        save_img_video_path = save_img_video_folder / out_file_name
+        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "cam-output-complex-yolo-track.avi"
 
         images_to_video(
             sorted(list(Path(save_folder2).iterdir())),

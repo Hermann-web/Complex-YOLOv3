@@ -362,3 +362,44 @@ results
 - with `TEST_TRACKING = False`, `TEST_DETECTION = False`: ![video output](./images/output/complex-yolo-track-img/cam-output-complex-yolo.avi)
 
   ![result of tracking on img space](./images/output/complex-yolo-track-img/cam-output-complex-yolo.gif)
+
+## build poetry project
+
+- save deps
+
+```bash
+cat requirements.txt | sed 's/ //g' | sed 's/[#>].*$//g' | grep -v "^$" | cut -d= -f1 | xargs -n 1 pip3 show | awk '/Name:|Version:/ {printf $2; if (/Name:/) printf "~="; else printf "\n"}' > docs/req/linux.venv38.req.txt
+```
+
+- create project
+
+```bash
+poetry init
+```
+
+- add source for pytorch
+
+```bash
+# for gpu
+poetry source add --priority=explicit pytorch-gpu-src https://download.pytorch.org/whl/cu118
+# or for cpu
+poetry source add --priority=explicit pytorch-cpu https://download.pytorch.org/whl/cpu
+```
+
+- prep env and install
+
+```bash
+poetry use 3.8
+poetry add torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --source pytorch-cpu
+poetry add opencv-python tqdm
+poetry add mayavi shapely
+poetry add scipy==1.10.1
+```
+
+- export deps
+
+```bash
+poetry export -f requirements.txt --output docs/req/linux.poetry.req.txt --without-hashes
+
+cat requirements.txt | sed 's/ //g' | sed 's/[#>].*$//g' | grep -v "^$" | cut -d= -f1 | xargs -n 1 pip3 show | awk '/Name:|Version:/ {printf $2; if (/Name:/) printf "~="; else printf "\n"}' > docs/req/linux.venv38.2.req.txt
+```

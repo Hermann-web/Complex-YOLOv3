@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "complex-yolov3"
+version = "0.1.0"
+description = ""
+authors = ["Hermann Agosssou"]
+license = "MIT"
+readme = "README.md"
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.12"
+torch = {version = "2.2.0", source = "pytorch-cpu"}
+torchvision = {version = "0.17.0", source = "pytorch-cpu"}
+torchaudio = {version = "2.2.0", source = "pytorch-cpu"}
+opencv-python = "^4.9.0.80"
+tqdm = "^4.66.2"
+shapely = "^2.0.3"
+mayavi = "^4.8.1"
+scipy = "^1.10.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

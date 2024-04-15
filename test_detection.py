@@ -17,11 +17,14 @@ from utils.kitti_yolo_dataset import KittiYOLODataset
 import utils.config as cnf
 import utils.mayavi_viewer as mview
 
-OUTPUT_FOLDER_COMPLEX_YOLO = OUTPUT_FOLDER / "complex-yolo-track"
+OUTPUT_FOLDER_COMPLEX_YOLO = OUTPUT_FOLDER / "complex-yolo-detect-only"
+OUTPUT_FOLDER_COMPLEX_YOLO.mkdir(exist_ok=True)
 
-OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO/"dev-images"
+OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO/"bev-images"
+OUTPUT_FOLDER_COMPLEX_YOLO_BEV.mkdir(exist_ok=True)
 
 OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO/"cam-images"
+OUTPUT_FOLDER_COMPLEX_YOLO_CAM.mkdir(exist_ok=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

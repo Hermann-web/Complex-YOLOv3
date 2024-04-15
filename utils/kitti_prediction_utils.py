@@ -22,7 +22,7 @@ def predictions_to_kitti_format(img_detections:List[torch.Tensor], calib:kitti_u
     print("predictions.shape[1]-1 = ",predictions.shape[1]-1)
     print("dddd = ",predictions[:, :predictions.shape[1]-1].shape)
     print("predictions.shape[0] = ",predictions.shape[0])
-    predictions = bev_utils.inverse_yolo_target(predictions, cnf.boundary, add_conf=add_conf)
+    predictions = bev_utils.inverse_yolo_target(predictions, cnf.boundary, add_conf=True)
     assert predictions.ndim ==2 and predictions.shape[1]==9
     if predictions.shape[0]:
         predictions[:, 1: predictions.shape[1]-1] = aug_utils.lidar_to_camera_box(predictions[:, 1:predictions.shape[1]-1], calib.V2C, calib.R0, calib.P)

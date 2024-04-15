@@ -5,8 +5,8 @@ tqdm
 opencv-python==4.9.0.80
 torch==2.2.0
 torchvision
-torchstudio
+torchaudio
 mayavi
 shapely
 PYQt5
-
+scipy
