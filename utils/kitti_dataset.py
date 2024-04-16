@@ -53,7 +53,7 @@ class KittiDataset(torch_data.Dataset):
 
     def get_label(self, idx):
         label_file = os.path.join(self.label_path, '%06d.txt' % idx)
-        assert os.path.exists(label_file)
+        assert os.path.exists(label_file), f"label_file {label_file} not found"
         return kitti_utils.read_label(label_file)
 
     def __len__(self):

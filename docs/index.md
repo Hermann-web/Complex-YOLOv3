@@ -403,3 +403,15 @@ poetry export -f requirements.txt --output docs/req/linux.poetry.req.txt --witho
 
 cat requirements.txt | sed 's/ //g' | sed 's/[#>].*$//g' | grep -v "^$" | cut -d= -f1 | xargs -n 1 pip3 show | awk '/Name:|Version:/ {printf $2; if (/Name:/) printf "~="; else printf "\n"}' > docs/req/linux.venv38.2.req.txt
 ```
+
+### some refactoring
+
+i've:
+
+- added a script to download a small part of the kitti datase
+- added a script with some user variables to parse kitti dataset: `split:optional` (split-label as train, test, ...; if set, should match a filename in ImageSets to selectimages; if not set, all images will be considered), `use-subfolder:store=False` (if set, put the images in a folder named with the split label) and `max-frames:store=False` (if set, select the n first images after split)
+- added new variables to argparse: `max-frames:optional=100`, `show:store=False`
+
+```sh
+poetry run python test_tracking_complex_yolo.py --split=train --folder=2011_09_26_drive_0005_sync --save_result --aspect_ratio_thresh=10 --max_frames 100 --conf_thres 0.7
+```

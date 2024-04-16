@@ -29,22 +29,94 @@ import sys
 sys.path.append("bytetrack/tracker")
 from bytetrack.tracker.byte_tracker import BYTETracker
 from bytetrack.run_tracker import run_tracker_on_frame
+from dataclasses import dataclass
 
-OUTPUT_FOLDER_COMPLEX_YOLO_TRACK = OUTPUT_FOLDER / "complex-yolo-track"
-OUTPUT_FOLDER_COMPLEX_YOLO_TRACK.mkdir(exist_ok=True)
+@dataclass
+class OutputFolders:
+    complex_yolo_track: Path
+    bev_images: Path
+    cam_images: Path
+    bev_images_detect: Path
+    cam_images_detect: Path
 
-# where to save images post detection
-OUTPUT_FOLDER_COMPLEX_YOLO_BEV = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK/"bev-images"
-OUTPUT_FOLDER_COMPLEX_YOLO_BEV.mkdir(exist_ok=True)
-OUTPUT_FOLDER_COMPLEX_YOLO_CAM = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK/"cam-images"
-OUTPUT_FOLDER_COMPLEX_YOLO_CAM.mkdir(exist_ok=True)
+def create_output_folders(output_folder:os.PathLike):
+    output_folder = Path(output_folder).resolve()
+    assert output_folder.exists() and output_folder.is_dir()
+
+    output_folder_complex_yolo_track = output_folder / "complex-yolo-track"
+    output_folder_complex_yolo_track.mkdir(exist_ok=True)
+
+    output_folder_complex_yolo_bev = output_folder_complex_yolo_track / "bev-images"
+    output_folder_complex_yolo_bev.mkdir(exist_ok=True)
+    output_folder_complex_yolo_cam = output_folder_complex_yolo_track / "cam-images"
+    output_folder_complex_yolo_cam.mkdir(exist_ok=True)
+
+    output_folder_complex_yolo_bev_detect = output_folder_complex_yolo_track / "bev-images-detect"
+    output_folder_complex_yolo_bev_detect.mkdir(exist_ok=True)
+    output_folder_complex_yolo_cam_detect = output_folder_complex_yolo_track / "cam-images-detect"
+    output_folder_complex_yolo_cam_detect.mkdir(exist_ok=True)
+
+    return OutputFolders(
+        complex_yolo_track=output_folder_complex_yolo_track,
+        bev_images=output_folder_complex_yolo_bev,
+        cam_images=output_folder_complex_yolo_cam,
+        bev_images_detect=output_folder_complex_yolo_bev_detect,
+        cam_images_detect=output_folder_complex_yolo_cam_detect
+    )
 
 
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
 
 TEST_TRACKING = True
 TEST_DETECTION = True
 TEST_TRACKING_FROM_IMG = True
+
+def initialise_io_and_timer(vis_folder:Path,label:str="img"):
+    cam_results = []
+    start_time2 = time.time()
+    timer2 = Timer()
+    timestamp = time.strftime(f"%Y_%m_%d_%H_%M_%S-{label}", time.localtime())
+    save_folder2 = vis_folder / timestamp
+    save_folder2.mkdir(exist_ok=True)
+    res_file2 = str(vis_folder/f"{timestamp}.txt")
+    return cam_results,start_time2,timer2,save_folder2,res_file2
+
+def load_darknet_model(opt):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Set up model
+    model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
+    # Load checkpoint weights
+    model.load_state_dict(torch.load(opt.weights_path, map_location=device))
+    # Eval mode
+    model.eval()
+    return model
+
+def get_detections(opt, model, bev_maps):
+    # Configure bev image
+    input_imgs = Variable(bev_maps.type(Tensor))
+
+    # Get detections 
+    with torch.no_grad():
+        detections_base = model(input_imgs)
+        detections_base: List[torch.Tensor] = utils.non_max_suppression_rotated_bbox(detections_base, opt.conf_thres, opt.nms_thres) 
+    img_detections = []  # Stores detections for each image index
+    img_detections.extend(detections_base)
+
+    # get detections
+    detections = img_detections[0]
+
+    return img_detections,detections
+
+def get_bev_map_from_bev_img_data(bev_maps):
+    bev_maps:np.ndarray = torch.squeeze(bev_maps).numpy()
+    RGB_Map = np.zeros((cnf.BEV_WIDTH, cnf.BEV_WIDTH, 3))
+    RGB_Map[:, :, 2] = bev_maps[0, :, :]  # r_map
+    RGB_Map[:, :, 1] = bev_maps[1, :, :]  # g_map
+    RGB_Map[:, :, 0] = bev_maps[2, :, :]  # b_map
+    RGB_Map *= 255
+    RGB_Map = RGB_Map.astype(np.uint8)
+    return bev_maps,RGB_Map
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -73,92 +145,68 @@ if __name__ == "__main__":
     )
     parser.add_argument('--min_box_area', type=float, default=10, help='filter out tiny boxes')
     parser.add_argument("--mot20", dest="mot20", default=False, action="store_true", help="test mot20.")
+    parser.add_argument("--max_frames", type=int, default=100, help="max frames")
+    parser.add_argument("--show", default=False, action="store_true", help="show frames")
     
     # parse the user args
     opt = parser.parse_args()
     print(opt)
 
+    max_frames:int = opt.max_frames
+    show_frames:bool = opt.show
+
+    output_folder = OUTPUT_FOLDER / opt.folder
+    output_folder.mkdir(exist_ok=True, parents=True)
+    outf = create_output_folders(output_folder=output_folder)
+
     if TEST_TRACKING:
         # some initialisation for tracking
         tracker = BYTETracker(opt)
-        results = []
-        start_time = time.time()
-        timer = Timer()
-        vis_folder = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK
-        timestamp = time.strftime("%Y_%m_%d_%H_%M_%S-bev", time.localtime())
-        save_folder = vis_folder / timestamp
-        save_folder.mkdir(exist_ok=True)
-        res_file = str(vis_folder/f"{timestamp}.txt")
+        bev_results, start_time, timer, save_folder, res_file = initialise_io_and_timer(outf.complex_yolo_track, label="bev")
 
     if TEST_TRACKING_FROM_IMG:
         # some initialisation for tracking
         tracker_img = BYTETracker(opt)
-        cam_results = []
-        start_time2 = time.time()
-        timer2 = Timer()
-        vis_folder = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK
-        timestamp = time.strftime("%Y_%m_%d_%H_%M_%S-img", time.localtime())
-        save_folder2 = vis_folder / timestamp
-        save_folder2.mkdir(exist_ok=True)
-        res_file2 = str(vis_folder/f"{timestamp}.txt")
+        cam_results, start_time2, timer2, save_folder2, res_file2 = initialise_io_and_timer(outf.complex_yolo_track, label="img")
         
 
     # some initialisation for model
     classes = utils.load_classes(opt.class_path)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Set up model
-    model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
-    # Load checkpoint weights
-    model.load_state_dict(torch.load(opt.weights_path, map_location=device))
-    # Eval mode
-    model.eval()
+    model = load_darknet_model(opt)
     
     # instantiate the dataloader
     dataset = KittiYOLODataset(cnf.root_dir, split=opt.split, mode='TEST', folder=opt.folder, data_aug=False)
     data_loader = torch_data.DataLoader(dataset, 1, shuffle=False)
 
-    Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+    
 
                           
     for index, (img_paths, bev_maps) in enumerate(data_loader):
 
-        print(f"img_paths = {img_paths}")
-        
-        # Configure bev image
-        input_imgs = Variable(bev_maps.type(Tensor))
+        if max_frames > 0 and index +1 >= max_frames:
+            break
 
-        # Get detections 
-        with torch.no_grad():
-            detections_base = model(input_imgs)
-            detections_base: List[torch.Tensor] = utils.non_max_suppression_rotated_bbox(detections_base, opt.conf_thres, opt.nms_thres) 
-        img_detections = []  # Stores detections for each image index
-        img_detections.extend(detections_base)
+        print(f"img_paths = {img_paths}")
+        index_str = str(index).zfill(3)
+        
+        img_detections, detections = get_detections(opt, model, bev_maps)
 
 
         # get BEV_map from bev img data
-        bev_maps:np.ndarray = torch.squeeze(bev_maps).numpy()
-        RGB_Map = np.zeros((cnf.BEV_WIDTH, cnf.BEV_WIDTH, 3))
-        RGB_Map[:, :, 2] = bev_maps[0, :, :]  # r_map
-        RGB_Map[:, :, 1] = bev_maps[1, :, :]  # g_map
-        RGB_Map[:, :, 0] = bev_maps[2, :, :]  # b_map
-        RGB_Map *= 255
-        RGB_Map = RGB_Map.astype(np.uint8)
+        bev_maps, RGB_Map = get_bev_map_from_bev_img_data(bev_maps)
 
+        # Rescale boxes to original image
+        detections_rescaled = utils.rescale_boxes(detections, opt.img_size, RGB_Map.shape[:2])
 
-        if TEST_TRACKING:
-            # some data for tracking
-            height, width, _ = bev_maps.shape
-            bev_img_info = {
-                "height": height,
-                "width": width,
-                "raw_img": RGB_Map
-            }
-            frame_id = index
-            end_time = time.time()
-            print(f"FPS: {(1.0/(end_time-start_time)):0.2f}")
-            start_time = end_time
-            print(f"img_info: width={width} heigth={height}")
-            print(f"img_detections: type={type(img_detections)} len={len(img_detections)} elt0:type={type(img_detections[0])} shape={img_detections[0].shape}")
+        # Save BEV image
+        bev_image_path = outf.bev_images / f"BEV_image_{index_str}.jpg"
+        cv2.imwrite(str(bev_image_path), RGB_Map)
+
+        # Save 2D image
+        img2d = cv2.imread(img_paths[0])
+        img2d_path = outf.cam_images / f"2D_image_{index_str}.jpg"
+        cv2.imwrite(str(img2d_path), img2d)
+
 
         if TEST_TRACKING_FROM_IMG:
             img2d = cv2.imread(img_paths[0])
@@ -170,8 +218,9 @@ if __name__ == "__main__":
             # fuck the v does not contain the conf (score); the info is lost in the img_detections -> predictions_to_kitti_format -> objects_pred
             # and there's no sense or proper indexing. I may need to update the object 
 
-            img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
-            cv2.imshow("img2d", img2d)
+            if show_frames:
+                img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
+                cv2.imshow("img2d with plane boxes", img2d)
             
             # some data for tracking
             height, width = img2d.shape[:2]
@@ -188,16 +237,13 @@ if __name__ == "__main__":
             print(f"cam_img_info: width={width} heigth={height}")
             print(f"cam_img_detections: elt0:type={type(objects_pred_parsed)} shape={objects_pred_parsed.shape}")
 
-        # get detections
-        detections = img_detections[0]
 
-        # Rescale boxes to original image
-        detections = utils.rescale_boxes(detections, opt.img_size, RGB_Map.shape[:2])
+        
 
         if 1:
 
             if TEST_DETECTION:
-                for x, y, w, l, im, re, conf, cls_conf, cls_pred in detections:
+                for x, y, w, l, im, re, conf, cls_conf, cls_pred in detections_rescaled:
                     yaw = np.arctan2(im, re)
                     # Draw rotated box
                     bev_utils.drawRotatedBox(RGB_Map, x, y, w, l, yaw, cnf.colors[int(cls_pred)])
@@ -205,25 +251,41 @@ if __name__ == "__main__":
                 img2d = cv2.imread(img_paths[0])
                 calib = kitti_utils.Calibration(img_paths[0].replace(".png", ".txt").replace("image_2", "calib"))
                 objects_pred = pred_utils.predictions_to_kitti_format(img_detections, calib, img2d.shape, opt.img_size, add_conf=False)  
-                img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
 
-                cv2.imshow("bev img", RGB_Map)
-                cv2.imshow("img2d", img2d)
+                if show_frames: 
+                    img2d = mview.show_image_with_boxes(img2d, objects_pred, calib, False)
+                    cv2.imshow("img2d", img2d)
+                    cv2.imshow("bev img", RGB_Map)
 
-                index_str = str(index).zfill(3)
+                
 
                 # Save BEV image
-                bev_image_path = OUTPUT_FOLDER_COMPLEX_YOLO_BEV / f"BEV_image_{index_str}.jpg"
+                bev_image_path = outf.bev_images_detect / f"BEV_image_pred_{index_str}.jpg"
                 cv2.imwrite(str(bev_image_path), RGB_Map)
 
                 # Save 2D image
-                img2d_path = OUTPUT_FOLDER_COMPLEX_YOLO_CAM / f"2D_image_{index_str}.jpg"
+                img2d_path = outf.cam_images_detect / f"2D_image_pred_{index_str}.jpg"
                 cv2.imwrite(str(img2d_path), img2d)
 
                 if cv2.waitKey(0) & 0xFF == 27:
                     break
 
             if TEST_TRACKING:
+
+                # some data for tracking
+                height, width, _ = bev_maps.shape
+                bev_img_info = {
+                    "height": height,
+                    "width": width,
+                    "raw_img": RGB_Map
+                }
+                frame_id = index
+                end_time = time.time()
+                print(f"FPS: {(1.0/(end_time-start_time)):0.2f}")
+                start_time = end_time
+                print(f"img_info: width={width} heigth={height}")
+                print(f"detections: type={type(detections)} shape={detections.shape}")
+
                 detections_parsed = tracking_utils.parse_detections_for_bev(detections)
                 # convert numpy object to tensor
                 detections_parsed = torch.Tensor(detections_parsed)
@@ -239,7 +301,7 @@ if __name__ == "__main__":
                                                                 raw_img=bev_img_info['raw_img'], timer=timer
                                                                 )
                 print("done running tracker")
-                results.extend(tracklets)
+                bev_results.extend(tracklets)
                 print(f"nb_detection = {detections.shape[0]}")
                 print(f"nb_tracklets = {len(tracklets)}")
 
@@ -291,16 +353,16 @@ if __name__ == "__main__":
 
     if TEST_DETECTION:
 
-        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "bev-output-complex-yolo-detect.avi"
+        save_img_video_path = outf.bev_images_detect.with_suffix(".avi")
         images_to_video(
-            sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_BEV.iterdir())),
+            sorted(list(outf.bev_images_detect.iterdir())),
             save_img_video_path,
         )
         print(f"saved video to {save_img_video_path} ")
 
-        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "cam-output-complex-yolo-detect.avi"
+        save_img_video_path = outf.cam_images_detect.with_suffix(".avi")
         images_to_video(
-            sorted(list(OUTPUT_FOLDER_COMPLEX_YOLO_CAM.iterdir())),
+            sorted(list(outf.cam_images_detect.iterdir())),
             save_img_video_path,
         )
         print(f"saved video to {save_img_video_path} ")
@@ -308,10 +370,10 @@ if __name__ == "__main__":
     if TEST_TRACKING:
         if opt.save_result:
             with open(res_file, 'w') as f:
-                f.writelines(results)
+                f.writelines(bev_results)
             print(f"save results to {res_file}")
         
-        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "bev-output-complex-yolo-track.avi"
+        save_img_video_path = outf.complex_yolo_track / "bev-images-track.avi"
 
         images_to_video(
             sorted(list(Path(save_folder).iterdir())),
@@ -326,7 +388,7 @@ if __name__ == "__main__":
                 f.writelines(cam_results)
             print(f"save cam_results to {res_file2}")
         
-        save_img_video_path = OUTPUT_FOLDER_COMPLEX_YOLO_TRACK / "cam-output-complex-yolo-track.avi"
+        save_img_video_path = outf.complex_yolo_track / "cam-images-track.avi"
 
         images_to_video(
             sorted(list(Path(save_folder2).iterdir())),

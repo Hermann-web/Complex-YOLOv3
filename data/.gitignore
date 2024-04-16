@@ -1,2 +1,4 @@
-KITTI/object/2011_09_26_drive_0106_sync/
+KITTI/object/2011_09_26_drive_*/
 KITTI/temp
+KITTI/object/training/
+KITTI/object/testing/

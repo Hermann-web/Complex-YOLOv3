@@ -45,6 +45,8 @@ def objects_pred_parsing_for_bytetrack(objects_pred:List[kitti_utils.Object3d], 
     for i,obj in enumerate(objects_pred):
         box3d_pts_2d, box3d_pts_3d = kitti_utils.compute_box_3d(obj, calib.P)
 
+        if box3d_pts_2d is None:
+            continue
         
         if 0:
             L = [2,6,7,3]
@@ -74,7 +76,7 @@ def objects_pred_parsing_for_bytetrack(objects_pred:List[kitti_utils.Object3d], 
         corners_int = bev_corners.reshape(-1, 2)
         cv2.line(img2d, (corners_int[0, 0].round().astype(int), corners_int[0, 1].round().astype(int)), (corners_int[3, 0].round().astype(int), corners_int[3, 1].round().astype(int)), (255, 255, 0), 2)
     
-    cv2.imshow("img2d with plane boxes", img2d)
+    # cv2.imshow("img2d with plane boxes", img2d)
 
     # print("preds_parsed = ",preds_parsed)
     return preds_parsed

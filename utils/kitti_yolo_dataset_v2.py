@@ -13,7 +13,7 @@ USE_TORCH_INSTEAD_OF_NUMPY = False
 try:
     import torch
     import torch.nn.functional as F
-except:
+except Exception as e:
     assert not USE_TORCH_INSTEAD_OF_NUMPY
 
 
